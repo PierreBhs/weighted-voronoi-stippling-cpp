@@ -1,0 +1,11 @@
+build/
+.cache/
+CMakeUserPresets.json
+compile_commands.json
+__pycache__/
+dist/
+wheels/
+*.egg-info
+.venv/
+*.swp
+*~
