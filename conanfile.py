@@ -13,4 +13,5 @@ class ConanApplication(ConanFile):
 
     def requirements(self):
         self.requires("raylib/5.5")
-        self.requires("benchmark/1.9.1")
+        self.requires("benchmark/1.9.4")
+        self.requires("onetbb/2022.3.0")

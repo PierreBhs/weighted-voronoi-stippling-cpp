@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(raylib REQUIRED)
 find_package(benchmark REQUIRED)
 find_package(Threads REQUIRED)
+find_package(TBB REQUIRED)
 
 add_library(project_options INTERFACE)
 target_compile_features(project_options INTERFACE cxx_std_23)
@@ -29,8 +30,7 @@ add_library(
     src/level4_par_unseq.cpp
     src/level2_par_unseq.cpp
 )
-target_link_libraries(stippling_core PUBLIC project_options raylib Threads::Threads)
-target_link_libraries(stippling_core PUBLIC tbb)
+target_link_libraries(stippling_core PUBLIC project_options raylib Threads::Threads TBB::tbb)
 
 function(add_stippling_level target source)
     add_executable(${target} ${source})
@@ -48,12 +48,12 @@ add_stippling_level(level5 src/level5_tiled.cpp)
 add_stippling_level(level4_parallel src/level4_parallel.cpp)
 target_link_libraries(level4_parallel PRIVATE Threads::Threads)
 add_stippling_level(level4_par_unseq src/level4_par_unseq.cpp)
-target_link_libraries(level4_par_unseq PRIVATE Threads::Threads tbb)
+target_link_libraries(level4_par_unseq PRIVATE Threads::Threads TBB::tbb)
 add_stippling_level(level2_par_unseq src/level2_par_unseq.cpp)
-target_link_libraries(level2_par_unseq PRIVATE Threads::Threads tbb)
+target_link_libraries(level2_par_unseq PRIVATE Threads::Threads TBB::tbb)
 
 add_executable(voronoi_bench bench/benchmark_levels.cpp)
 target_link_libraries(voronoi_bench PRIVATE stippling_core benchmark::benchmark benchmark::benchmark_main)
 
 add_executable(weighted_cvd src/weighted_cvd.cpp)
-target_link_libraries(weighted_cvd PRIVATE project_options raylib Threads::Threads tbb)
+target_link_libraries(weighted_cvd PRIVATE project_options raylib Threads::Threads TBB::tbb)
