@@ -3,7 +3,7 @@
 C++23 implementations of *[Weighted Voronoi Stippling](https://www.cs.ubc.ca/labs/imager/tr/2002/secord2002b/secord.2002b.pdf)*
 
 <p align="center">
-  <img src="img/onepiece_original.jpg" width="100%" alt="Original" />
+  <img src="img/onepiece_original.jpg" width="60%" alt="Original" />
 </p>
 
 <p align="center">
