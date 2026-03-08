@@ -2,7 +2,16 @@
 
 C++23 implementations of *[Weighted Voronoi Stippling](https://www.cs.ubc.ca/labs/imager/tr/2002/secord2002b/secord.2002b.pdf)*
 
-<video src="img/stipple_onepiece_video.mp4" autoplay loop muted playsinline></video>
+<p align="center">
+  <img src="img/onepiece_original.jpg" width="100%" alt="Original" />
+</p>
+
+<p align="center">
+  <img src="img/onepiece_10k.png" width="32%" alt="10k generators" />
+  <img src="img/onepiece_75k.png" width="32%" alt="75k generators" />
+  <img src="img/onepiece_170k.png" width="32%" alt="170k generators" />
+</p>
+<p align="center"><i>10k · 75k · 170k generators</i></p>
 
 The repo implements:
 
