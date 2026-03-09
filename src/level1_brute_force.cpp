@@ -57,6 +57,7 @@ auto run_level1(const config& cfg, const image_data& image, const execution_opti
         const auto move = move_generators(*generators, accum, image.width, image.height);
         if (move.average_displacement < cfg.convergence) {
             converged = true;
+            ++iter;
             break;
         }
     }

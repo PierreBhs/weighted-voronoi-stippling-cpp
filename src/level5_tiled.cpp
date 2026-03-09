@@ -119,19 +119,18 @@ auto run_level5(const config& cfg, const image_data& image, const execution_opti
 
     auto accum = std::vector<accumulator>(cfg.num_generators);
 
+    const auto supersample = cfg.supersample;
+    const auto sample_scale = 1. / static_cast<double>(supersample * supersample);
+    const auto tile_step = static_cast<std::size_t>(cfg.tile_size);
+    const auto overlap = static_cast<std::size_t>(cfg.tile_overlap);
+
     const auto total_t0 = steady_clock::now();
-    auto       iterations_executed = 0uz;
+    auto       iter = 0uz;
     auto       converged = false;
 
-    for (auto iter = 0uz; iter < cfg.max_iterations; ++iter) {
+    for (; iter < cfg.max_iterations; ++iter) {
         populate_grid(state.global_grid, *generators);
         std::ranges::fill(accum, accumulator{});
-
-        const auto supersample = cfg.supersample;
-        const auto sample_scale = 1. / static_cast<double>(supersample * supersample);
-
-        const auto tile_step = static_cast<std::size_t>(cfg.tile_size);
-        const auto overlap = static_cast<std::size_t>(cfg.tile_overlap);
 
         for (auto tile_y0 = 0uz; tile_y0 < image.height; tile_y0 += tile_step) {
             const auto tile_y1 = std::min(tile_y0 + tile_step, image.height);
@@ -184,10 +183,9 @@ auto run_level5(const config& cfg, const image_data& image, const execution_opti
         }
 
         const auto move = move_generators(*generators, accum, image.width, image.height);
-        iterations_executed = iter + 1;
-
         if (move.average_displacement < cfg.convergence) {
             converged = true;
+            ++iter;
             break;
         }
     }
@@ -205,7 +203,7 @@ auto run_level5(const config& cfg, const image_data& image, const execution_opti
 
     return level_summary{
         .total_ms = total,
-        .iterations_executed = iterations_executed,
+        .iterations_executed = iter,
         .converged = converged,
         .generators = std::move(*generators),
     };

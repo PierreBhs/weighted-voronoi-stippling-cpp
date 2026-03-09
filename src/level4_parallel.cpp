@@ -115,10 +115,10 @@ auto run_level4_parallel(const config& cfg, const image_data& image, const execu
         std::vector<std::vector<accumulator>>(num_workers, std::vector<accumulator>(cfg.num_generators));
 
     const auto total_t0 = steady_clock::now();
-    auto       iterations_executed = 0uz;
+    auto       iter = 0uz;
     auto       converged = false;
 
-    for (auto iter = 0uz; iter < cfg.max_iterations; ++iter) {
+    for (; iter < cfg.max_iterations; ++iter) {
         tree.build(
             generators->data(), generators->size(), static_cast<float>(image.width), static_cast<float>(image.height));
 
@@ -127,10 +127,9 @@ auto run_level4_parallel(const config& cfg, const image_data& image, const execu
             voronoi, image.density, accum, thread_accums, image.width, image.height, num_workers);
 
         const auto move = move_generators(*generators, accum, image.width, image.height);
-        iterations_executed = iter + 1;
-
         if (move.average_displacement < cfg.convergence) {
             converged = true;
+            ++iter;
             break;
         }
     }
@@ -148,7 +147,7 @@ auto run_level4_parallel(const config& cfg, const image_data& image, const execu
 
     return level_summary{
         .total_ms = total,
-        .iterations_executed = iterations_executed,
+        .iterations_executed = iter,
         .converged = converged,
         .generators = std::move(*generators),
     };

@@ -139,19 +139,18 @@ auto run_level3(const config& cfg, const image_data& image, const execution_opti
     auto accum = std::vector<accumulator>(cfg.num_generators);
 
     const auto total_t0 = steady_clock::now();
-    auto       iterations_executed = 0uz;
+    auto       iter = 0uz;
     auto       converged = false;
 
-    for (auto iter = 0uz; iter < cfg.max_iterations; ++iter) {
+    for (; iter < cfg.max_iterations; ++iter) {
         populate_grid(grid, *generators);
         assign_voronoi_grid_with_spans(grid, *generators, voronoi, spans, image.width, image.height);
         compute_centroids_prefix(spans, tables, accum);
 
         const auto move = move_generators(*generators, accum, image.width, image.height);
-        iterations_executed = iter + 1;
-
         if (move.average_displacement < cfg.convergence) {
             converged = true;
+            ++iter;
             break;
         }
     }
@@ -169,7 +168,7 @@ auto run_level3(const config& cfg, const image_data& image, const execution_opti
 
     return level_summary{
         .total_ms = total,
-        .iterations_executed = iterations_executed,
+        .iterations_executed = iter,
         .converged = converged,
         .generators = std::move(*generators),
     };
