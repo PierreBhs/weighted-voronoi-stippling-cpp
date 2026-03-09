@@ -8,37 +8,37 @@ namespace {
 struct span_run
 {
     std::uint32_t generator{};
-    int           row{};
-    int           x_begin{};
-    int           x_end{};
+    std::size_t   row{};
+    std::size_t   x_begin{};
+    std::size_t   x_end{};
 };
 
 struct prefix_tables
 {
-    int                 width{};
-    int                 height{};
+    std::size_t         width{};
+    std::size_t         height{};
     std::vector<double> prefix_density;
     std::vector<double> prefix_x_density;
 };
 
-auto build_prefix_tables(std::span<const float> density, const int width, const int height) -> prefix_tables
+auto build_prefix_tables(std::span<const float> density, const std::size_t width, const std::size_t height)
+    -> prefix_tables
 {
-    const auto w = static_cast<std::size_t>(width);
-    const auto size = w * static_cast<std::size_t>(height);
+    const auto size = width * height;
 
     auto prefix_density = std::vector<double>(size);
     auto prefix_x_density = std::vector<double>(size);
 
-    for (auto y = 0; y < height; ++y) {
-        const auto row = static_cast<std::size_t>(y) * w;
+    for (auto y = 0uz; y < height; ++y) {
+        const auto row = y * width;
         auto       sum_density = 0.;
         auto       sum_x_density = 0.;
-        for (auto x = 0; x < width; ++x) {
-            const auto d = static_cast<double>(density[row + static_cast<std::size_t>(x)]);
+        for (auto x = 0uz; x < width; ++x) {
+            const auto d = static_cast<double>(density[row + x]);
             sum_density += d;
             sum_x_density += static_cast<double>(x) * d;
-            prefix_density[row + static_cast<std::size_t>(x)] = sum_density;
-            prefix_x_density[row + static_cast<std::size_t>(x)] = sum_x_density;
+            prefix_density[row + x] = sum_density;
+            prefix_x_density[row + x] = sum_x_density;
         }
     }
 
@@ -49,20 +49,19 @@ void assign_voronoi_grid_with_spans(const spatial_grid&      grid,
                                     std::span<const vec2>    generators,
                                     std::span<std::uint32_t> voronoi,
                                     std::vector<span_run>&   spans,
-                                    const int                width,
-                                    const int                height)
+                                    const std::size_t        width,
+                                    const std::size_t        height)
 {
     spans.clear();
 
-    for (auto y = 0; y < height; ++y) {
-        const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(width);
-        auto       current_gen = std::uint32_t{0};
-        auto       span_start = 0;
-        auto       first_pixel = true;
+    for (auto y = 0uz; y < height; ++y) {
+        auto current_gen = std::uint32_t{0};
+        auto span_start = 0uz;
+        auto first_pixel = true;
 
-        for (auto x = 0; x < width; ++x) {
+        for (auto x = 0uz; x < width; ++x) {
             const auto best_idx = nearest_in_grid(grid, generators, static_cast<float>(x), static_cast<float>(y));
-            voronoi[row + static_cast<std::size_t>(x)] = best_idx;
+            voronoi[(y * width) + x] = best_idx;
 
             if (first_pixel) {
                 current_gen = best_idx;
@@ -97,18 +96,17 @@ void compute_centroids_prefix(std::span<const span_run> spans,
 {
     std::ranges::fill(accum, accumulator{});
 
-    const auto width = static_cast<std::size_t>(tables.width);
     for (const auto& span : spans) {
-        const auto row = static_cast<std::size_t>(span.row) * width;
+        const auto row = span.row * tables.width;
         const auto fy = static_cast<double>(span.row);
-        const auto right = row + static_cast<std::size_t>(span.x_end);
+        const auto right = row + span.x_end;
         const auto p_right = tables.prefix_density[right];
         const auto rx_right = tables.prefix_x_density[right];
 
         auto p_left = 0.;
         auto rx_left = 0.;
         if (span.x_begin > 0) {
-            const auto left = row + static_cast<std::size_t>(span.x_begin - 1);
+            const auto left = row + span.x_begin - 1;
             p_left = tables.prefix_density[left];
             rx_left = tables.prefix_x_density[left];
         }
@@ -126,12 +124,11 @@ auto run_level3(const config& cfg, const image_data& image, const execution_opti
     -> result<level_summary>
 {
     auto grid = make_spatial_grid(image.width, image.height, cfg.num_generators);
-    auto voronoi =
-        std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+    auto voronoi = std::vector<std::uint32_t>(image.width * image.height);
     auto spans = std::vector<span_run>{};
     auto tables = build_prefix_tables(image.density, image.width, image.height);
 
-    spans.reserve(static_cast<std::size_t>(image.height) *
+    spans.reserve(image.height *
                   static_cast<std::size_t>(std::max(16.0, std::sqrt(static_cast<double>(cfg.num_generators)) * 4.0)));
 
     auto generators = rejection_sample(image.density, image.width, image.height, cfg.num_generators);

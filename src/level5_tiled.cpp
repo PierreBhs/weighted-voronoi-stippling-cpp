@@ -10,10 +10,10 @@ namespace {
 
 struct tile_window
 {
-    int expanded_x0{};
-    int expanded_y0{};
-    int expanded_x1{};
-    int expanded_y1{};
+    std::size_t expanded_x0{};
+    std::size_t expanded_y0{};
+    std::size_t expanded_x1{};
+    std::size_t expanded_y1{};
 };
 
 struct tiled_state
@@ -37,18 +37,18 @@ auto next_mark_value(tiled_state& state) -> std::uint32_t
 
 auto collect_tile_candidates(tiled_state&          state,
                              std::span<const vec2> generators,
-                             const int             width,
-                             const int             height,
-                             const int             x0,
-                             const int             y0,
-                             const int             x1,
-                             const int             y1,
-                             const int             overlap) -> tile_window
+                             const std::size_t     width,
+                             const std::size_t     height,
+                             const std::size_t     x0,
+                             const std::size_t     y0,
+                             const std::size_t     x1,
+                             const std::size_t     y1,
+                             const std::size_t     overlap) -> tile_window
 {
     state.candidates.clear();
 
-    const auto expanded_x0 = std::max(0, x0 - overlap);
-    const auto expanded_y0 = std::max(0, y0 - overlap);
+    const auto expanded_x0 = x0 > overlap ? x0 - overlap : 0uz;
+    const auto expanded_y0 = y0 > overlap ? y0 - overlap : 0uz;
     const auto expanded_x1 = std::min(width, x1 + overlap);
     const auto expanded_y1 = std::min(height, y1 + overlap);
 
@@ -60,8 +60,8 @@ auto collect_tile_candidates(tiled_state&          state,
         std::clamp(static_cast<int>(std::floor(static_cast<float>(expanded_y0) / state.global_grid.cell_size)),
                    0,
                    state.global_grid.rows - 1);
-    const auto max_probe_x = std::max(expanded_x0, expanded_x1 - 1);
-    const auto max_probe_y = std::max(expanded_y0, expanded_y1 - 1);
+    const auto max_probe_x = expanded_x1 > 0 ? expanded_x1 - 1 : 0uz;
+    const auto max_probe_y = expanded_y1 > 0 ? expanded_y1 - 1 : 0uz;
     const auto max_cell_x =
         std::clamp(static_cast<int>(std::floor(static_cast<float>(max_probe_x) / state.global_grid.cell_size)),
                    0,
@@ -130,19 +130,15 @@ auto run_level5(const config& cfg, const image_data& image, const execution_opti
         const auto supersample = cfg.supersample;
         const auto sample_scale = 1. / static_cast<double>(supersample * supersample);
 
-        for (auto tile_y0 = 0; tile_y0 < image.height; tile_y0 += cfg.tile_size) {
-            const auto tile_y1 = std::min(tile_y0 + cfg.tile_size, image.height);
-            for (auto tile_x0 = 0; tile_x0 < image.width; tile_x0 += cfg.tile_size) {
-                const auto tile_x1 = std::min(tile_x0 + cfg.tile_size, image.width);
-                const auto window = collect_tile_candidates(state,
-                                                            *generators,
-                                                            image.width,
-                                                            image.height,
-                                                            tile_x0,
-                                                            tile_y0,
-                                                            tile_x1,
-                                                            tile_y1,
-                                                            cfg.tile_overlap);
+        const auto tile_step = static_cast<std::size_t>(cfg.tile_size);
+        const auto overlap = static_cast<std::size_t>(cfg.tile_overlap);
+
+        for (auto tile_y0 = 0uz; tile_y0 < image.height; tile_y0 += tile_step) {
+            const auto tile_y1 = std::min(tile_y0 + tile_step, image.height);
+            for (auto tile_x0 = 0uz; tile_x0 < image.width; tile_x0 += tile_step) {
+                const auto tile_x1 = std::min(tile_x0 + tile_step, image.width);
+                const auto window = collect_tile_candidates(
+                    state, *generators, image.width, image.height, tile_x0, tile_y0, tile_x1, tile_y1, overlap);
 
                 state.local_generators.clear();
                 state.local_generators.reserve(state.candidates.size());
@@ -159,9 +155,8 @@ auto run_level5(const config& cfg, const image_data& image, const execution_opti
                 populate_grid(state.local_grid, state.local_generators);
 
                 for (auto y = tile_y0; y < tile_y1; ++y) {
-                    const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width);
                     for (auto x = tile_x0; x < tile_x1; ++x) {
-                        const auto density = static_cast<double>(image.density[row + static_cast<std::size_t>(x)]);
+                        const auto density = static_cast<double>(image.density[(y * image.width) + x]);
                         if (density <= 0.) {
                             continue;
                         }

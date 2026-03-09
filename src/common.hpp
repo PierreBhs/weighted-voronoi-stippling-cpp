@@ -59,23 +59,23 @@ struct config
 
 struct image_data
 {
-    int                width{};
-    int                height{};
+    std::size_t        width{};
+    std::size_t        height{};
     std::vector<float> density;
 };
 
 struct density_sampler
 {
-    int                                     width{};
-    int                                     height{};
+    std::size_t                             width{};
+    std::size_t                             height{};
     std::discrete_distribution<std::size_t> pixel_distribution;
 
     auto sample_point(std::mt19937& rng) -> vec2
     {
         auto       jitter = std::uniform_real_distribution<float>{0.f, 0.999f};
         const auto idx = pixel_distribution(rng);
-        const auto px = static_cast<int>(idx % static_cast<std::size_t>(width));
-        const auto py = static_cast<int>(idx / static_cast<std::size_t>(width));
+        const auto px = idx % width;
+        const auto py = idx / width;
         return {
             static_cast<float>(px) + jitter(rng),
             static_cast<float>(py) + jitter(rng),
@@ -194,19 +194,17 @@ inline auto parse_args(const int argc, char** argv) -> result<config>
     return cfg;
 }
 
-[[nodiscard]] inline auto load_image(const std::string& path) -> result<image_data>
+[[nodiscard]] inline auto load_image(std::string_view path) -> result<image_data>
 {
     rl::SetTraceLogLevel(rl::LOG_WARNING);
-    auto image = rl::LoadImage(path.c_str());
+    auto image = rl::LoadImage(path.data());
     if (image.data == nullptr || image.width <= 0 || image.height <= 0) {
         return std::unexpected(std::format("failed to load image '{}'", path));
     }
 
     rl::ImageFormat(&image, rl::PIXELFORMAT_UNCOMPRESSED_GRAYSCALE);
 
-    const auto w = image.width;
-    const auto h = image.height;
-    const auto size = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+    const auto size = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
     const auto pixels = std::span(reinterpret_cast<const std::uint8_t*>(image.data), size);
 
     auto density = std::vector<float>(size);
@@ -215,11 +213,13 @@ inline auto parse_args(const int argc, char** argv) -> result<config>
     }
 
     rl::UnloadImage(image);
-    return image_data{w, h, std::move(density)};
+    return image_data{
+        static_cast<std::size_t>(image.width), static_cast<std::size_t>(image.height), std::move(density)};
 }
 
-[[nodiscard]] inline auto make_density_sampler(std::span<const float> density, const int width, const int height)
-    -> density_sampler
+[[nodiscard]] inline auto make_density_sampler(std::span<const float> density,
+                                               const std::size_t      width,
+                                               const std::size_t      height) -> density_sampler
 {
     return density_sampler{
         .width = width,
@@ -228,33 +228,32 @@ inline auto parse_args(const int argc, char** argv) -> result<config>
     };
 }
 
+// [[nodiscard]] inline constexpr auto to_idx(auto x, auto y) -> std::size_t {}
+
 inline auto rejection_sample(std::span<const float> density,
-                             const int              width,
-                             const int              height,
+                             const std::size_t      width,
+                             const std::size_t      height,
                              const std::size_t      count,
                              const std::uint32_t    seed = 2026) -> result<std::vector<vec2>>
 {
     auto fallback_sampler = make_density_sampler(density, width, height);
 
     auto rng = std::mt19937{seed};
-    auto dist_x = std::uniform_real_distribution<float>{0.f, static_cast<float>(width) - 0.001f};
-    auto dist_y = std::uniform_real_distribution<float>{0.f, static_cast<float>(height) - 0.001f};
+    auto dist_x = std::uniform_int_distribution<std::size_t>{0, width - 1};
+    auto dist_y = std::uniform_int_distribution<std::size_t>{0, height - 1};
     auto dist_p = std::uniform_real_distribution<float>{0.f, 1.f};
 
     auto points = std::vector<vec2>{};
     points.reserve(count);
 
-    const auto     w = static_cast<std::size_t>(width);
     auto           attempts_since_hit = 0uz;
     constexpr auto max_misses = 1'000'000uz;
 
     while (points.size() < count) {
         const auto x = dist_x(rng);
         const auto y = dist_y(rng);
-        const auto px = static_cast<std::size_t>(x);
-        const auto py = static_cast<std::size_t>(y);
-        if (density[py * w + px] > dist_p(rng)) {
-            points.emplace_back(x, y);
+        if (density[(y * width) + x] > dist_p(rng)) {
+            points.emplace_back(static_cast<float>(x), static_cast<float>(y));
             attempts_since_hit = 0;
         } else if (++attempts_since_hit >= max_misses) {
             while (points.size() < count) {
@@ -269,16 +268,14 @@ inline auto rejection_sample(std::span<const float> density,
 inline void compute_centroids(std::span<const std::uint32_t> voronoi,
                               std::span<const float>         density,
                               std::span<accumulator>         accum,
-                              const int                      width,
-                              const int                      height)
+                              const std::size_t              width,
+                              const std::size_t              height)
 {
     std::ranges::fill(accum, accumulator{});
 
-    const auto w = static_cast<std::size_t>(width);
-    for (auto y = 0; y < height; ++y) {
-        const auto row = static_cast<std::size_t>(y) * w;
-        for (auto x = 0; x < width; ++x) {
-            const auto idx = row + static_cast<std::size_t>(x);
+    for (auto y = 0uz; y < height; ++y) {
+        for (auto x = 0uz; x < width; ++x) {
+            const auto idx = (y * width) + x;
             const auto gen = voronoi[idx];
             const auto d = static_cast<double>(density[idx]);
             accum[gen].mass += d;
@@ -290,8 +287,8 @@ inline void compute_centroids(std::span<const std::uint32_t> voronoi,
 
 inline auto move_generators(std::span<vec2>              generators,
                             std::span<const accumulator> accum,
-                            const int                    width,
-                            const int                    height) -> move_result
+                            const std::size_t            width,
+                            const std::size_t            height) -> move_result
 {
     // Sum squared displacements, take a single sqrt at the end (RMS).
     // This avoids N per-generator sqrt calls
@@ -316,9 +313,12 @@ inline auto move_generators(std::span<vec2>              generators,
     };
 }
 
-inline void display_result(std::span<const vec2> generators, const int width, const int height, const char* title)
+inline void display_result(std::span<const vec2> generators,
+                           const std::size_t     width,
+                           const std::size_t     height,
+                           const char*           title)
 {
-    rl::InitWindow(width, height, title);
+    rl::InitWindow(static_cast<int>(width), static_cast<int>(height), title);
     rl::SetTargetFPS(1);
 
     while (!rl::WindowShouldClose()) {
@@ -333,13 +333,16 @@ inline void display_result(std::span<const vec2> generators, const int width, co
     rl::CloseWindow();
 }
 
-inline void save_result(const std::string& path, std::span<const vec2> generators, const int width, const int height)
+inline void save_result(std::string_view      path,
+                        std::span<const vec2> generators,
+                        const std::size_t     width,
+                        const std::size_t     height)
 {
-    auto img = rl::GenImageColor(width, height, rl::WHITE);
+    auto img = rl::GenImageColor(static_cast<int>(width), static_cast<int>(height), rl::WHITE);
     for (const auto& [x, y] : generators) {
         rl::ImageDrawCircle(&img, static_cast<int>(x), static_cast<int>(y), 1, rl::BLACK);
     }
-    rl::ExportImage(img, path.c_str());
+    rl::ExportImage(img, path.data());
     rl::UnloadImage(img);
     std::println("Saved result to {}", path);
 }

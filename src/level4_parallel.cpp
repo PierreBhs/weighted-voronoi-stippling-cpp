@@ -15,18 +15,18 @@ auto worker_count() -> unsigned
 
 void assign_voronoi_parallel(const quadtree&          tree,
                              std::span<std::uint32_t> voronoi,
-                             const int                width,
-                             const int                height,
+                             const std::size_t        width,
+                             const std::size_t        height,
                              const unsigned           num_workers)
 {
-    const auto rows_per_worker = (height + static_cast<int>(num_workers) - 1) / static_cast<int>(num_workers);
+    const auto rows_per_worker = (height + num_workers - 1) / num_workers;
 
     // Each thread writes to disjoint row ranges -- no synchronization needed
     auto workers = std::vector<std::jthread>{};
     workers.reserve(num_workers);
 
     for (auto t = 0u; t < num_workers; ++t) {
-        const auto y_begin = static_cast<int>(t) * rows_per_worker;
+        const auto y_begin = static_cast<std::size_t>(t) * rows_per_worker;
         const auto y_end = std::min(y_begin + rows_per_worker, height);
         if (y_begin >= height) {
             break;
@@ -34,10 +34,9 @@ void assign_voronoi_parallel(const quadtree&          tree,
 
         workers.emplace_back([&tree, voronoi, width, y_begin, y_end] {
             for (auto y = y_begin; y < y_end; ++y) {
-                const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(width);
                 const auto fy = static_cast<float>(y);
-                for (auto x = 0; x < width; ++x) {
-                    voronoi[row + static_cast<std::size_t>(x)] = tree.nearest(static_cast<float>(x), fy);
+                for (auto x = 0uz; x < width; ++x) {
+                    voronoi[(y * width) + x] = tree.nearest(static_cast<float>(x), fy);
                 }
             }
         });
@@ -48,8 +47,8 @@ void compute_centroids_parallel(std::span<const std::uint32_t>         voronoi,
                                 std::span<const float>                 density,
                                 std::span<accumulator>                 accum,
                                 std::vector<std::vector<accumulator>>& thread_accums,
-                                const int                              width,
-                                const int                              height,
+                                const std::size_t                      width,
+                                const std::size_t                      height,
                                 const unsigned                         num_workers)
 {
     const auto num_generators = accum.size();
@@ -57,26 +56,24 @@ void compute_centroids_parallel(std::span<const std::uint32_t>         voronoi,
         std::ranges::fill(local, accumulator{});
     }
 
-    const auto rows_per_worker = (height + static_cast<int>(num_workers) - 1) / static_cast<int>(num_workers);
+    const auto rows_per_worker = (height + num_workers - 1) / num_workers;
 
     {
         auto workers = std::vector<std::jthread>{};
         workers.reserve(num_workers);
 
         for (auto t = 0u; t < num_workers; ++t) {
-            const auto y_begin = static_cast<int>(t) * rows_per_worker;
+            const auto y_begin = static_cast<std::size_t>(t) * rows_per_worker;
             const auto y_end = std::min(y_begin + rows_per_worker, height);
             if (y_begin >= height) {
                 break;
             }
 
             workers.emplace_back([&voronoi, &density, &thread_accums, t, width, y_begin, y_end] {
-                auto&      local = thread_accums[t];
-                const auto w = static_cast<std::size_t>(width);
+                auto& local = thread_accums[t];
                 for (auto y = y_begin; y < y_end; ++y) {
-                    const auto row = static_cast<std::size_t>(y) * w;
-                    for (auto x = 0; x < width; ++x) {
-                        const auto idx = row + static_cast<std::size_t>(x);
+                    for (auto x = 0uz; x < width; ++x) {
+                        const auto idx = (y * width) + x;
                         const auto gen = voronoi[idx];
                         const auto d = static_cast<double>(density[idx]);
                         local[gen].mass += d;
@@ -111,7 +108,7 @@ auto run_level4_parallel(const config& cfg, const image_data& image, const execu
     auto accum = std::vector<accumulator>(cfg.num_generators);
     auto tree = quadtree{};
     auto voronoi =
-        std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+        std::vector<std::uint32_t>(image.width * image.height);
 
     const auto num_workers = worker_count();
     auto       thread_accums =

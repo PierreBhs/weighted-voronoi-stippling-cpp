@@ -14,8 +14,7 @@ auto run_level4(const config& cfg, const image_data& image, const execution_opti
 
     auto accum = std::vector<accumulator>(cfg.num_generators);
     auto tree = quadtree{};
-    auto voronoi =
-        std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+    auto voronoi = std::vector<std::uint32_t>(image.width * image.height);
 
     const auto total_t0 = steady_clock::now();
     auto       iterations_executed = 0uz;
@@ -25,11 +24,10 @@ auto run_level4(const config& cfg, const image_data& image, const execution_opti
         tree.build(
             generators->data(), generators->size(), static_cast<float>(image.width), static_cast<float>(image.height));
 
-        for (auto y = 0; y < image.height; ++y) {
-            const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width);
+        for (auto y = 0uz; y < image.height; ++y) {
             const auto fy = static_cast<float>(y);
-            for (auto x = 0; x < image.width; ++x) {
-                voronoi[row + static_cast<std::size_t>(x)] = tree.nearest(static_cast<float>(x), fy);
+            for (auto x = 0uz; x < image.width; ++x) {
+                voronoi[(y * image.width) + x] = tree.nearest(static_cast<float>(x), fy);
             }
         }
 

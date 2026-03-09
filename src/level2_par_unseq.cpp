@@ -9,7 +9,7 @@ auto run_level2_par_unseq(const config& cfg, const image_data& image, const exec
 {
     auto grid = make_spatial_grid(image.width, image.height, cfg.num_generators);
     auto voronoi =
-        std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+        std::vector<std::uint32_t>(image.width * image.height);
 
     auto generators = rejection_sample(image.density, image.width, image.height, cfg.num_generators);
     if (!generators) {

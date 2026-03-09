@@ -27,8 +27,7 @@ auto initialize(const config& cfg, const image_data& image) -> result<stippling_
     return stippling_state{
         .generators = std::move(*generators),
         .accum = std::vector<accumulator>(cfg.num_generators),
-        .voronoi =
-            std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height)),
+        .voronoi = std::vector<std::uint32_t>(image.width * image.height),
         .grid = make_spatial_grid(image.width, image.height, cfg.num_generators),
         .converged = false,
         .iteration = 0,
@@ -114,7 +113,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    rl::InitWindow(image->width, image->height, "Weighted Voronoi Stippling");
+    rl::InitWindow(static_cast<int>(image->width), static_cast<int>(image->height), "Weighted Voronoi Stippling");
     rl::SetTargetFPS(20);
 
     while (!rl::WindowShouldClose()) {

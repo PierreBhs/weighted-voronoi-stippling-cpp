@@ -18,7 +18,8 @@ struct spatial_grid
     std::vector<std::vector<std::uint32_t>> cells;
 };
 
-inline auto make_spatial_grid(const int width, const int height, const std::size_t num_generators) -> spatial_grid
+inline auto make_spatial_grid(const std::size_t width, const std::size_t height, const std::size_t num_generators)
+    -> spatial_grid
 {
     // Dividing by 2.f still creates big enough cells and makes the algo faster
     const auto cell_size =
@@ -91,14 +92,12 @@ inline auto nearest_in_grid(const spatial_grid& grid, std::span<const vec2> gene
 inline void assign_voronoi_grid(const spatial_grid&      grid,
                                 std::span<const vec2>    generators,
                                 std::span<std::uint32_t> voronoi,
-                                const int                width,
-                                const int                height)
+                                const std::size_t        width,
+                                const std::size_t        height)
 {
-    for (auto y = 0; y < height; ++y) {
-        const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(width);
-        for (auto x = 0; x < width; ++x) {
-            voronoi[row + static_cast<std::size_t>(x)] =
-                nearest_in_grid(grid, generators, static_cast<float>(x), static_cast<float>(y));
+    for (auto y = 0uz; y < height; ++y) {
+        for (auto x = 0uz; x < width; ++x) {
+            voronoi[(y * width) + x] = nearest_in_grid(grid, generators, static_cast<float>(x), static_cast<float>(y));
         }
     }
 }
@@ -106,17 +105,17 @@ inline void assign_voronoi_grid(const spatial_grid&      grid,
 inline void assign_voronoi_grid_par(const spatial_grid&      grid,
                                     std::span<const vec2>    generators,
                                     std::span<std::uint32_t> voronoi,
-                                    const int                width,
-                                    const int                height)
+                                    const std::size_t        width,
+                                    const std::size_t        height)
 {
-    const auto rows = std::views::iota(0, height);
-    std::for_each(std::execution::par_unseq, rows.begin(), rows.end(), [&grid, generators, voronoi, width](int y) {
-        const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(width);
-        for (auto x = 0; x < width; ++x) {
-            voronoi[row + static_cast<std::size_t>(x)] =
-                nearest_in_grid(grid, generators, static_cast<float>(x), static_cast<float>(y));
-        }
-    });
+    const auto rows = std::views::iota(0uz, height);
+    std::for_each(
+        std::execution::par_unseq, rows.begin(), rows.end(), [&grid, generators, voronoi, width](std::size_t y) {
+            for (auto x = 0uz; x < width; ++x) {
+                voronoi[(y * width) + x] =
+                    nearest_in_grid(grid, generators, static_cast<float>(x), static_cast<float>(y));
+            }
+        });
 }
 
 }  // namespace stippling

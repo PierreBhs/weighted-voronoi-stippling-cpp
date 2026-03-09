@@ -18,10 +18,9 @@ auto run_level4_par_unseq(const config& cfg, const image_data& image, const exec
 
     auto accum = std::vector<accumulator>(cfg.num_generators);
     auto tree = quadtree{};
-    auto voronoi =
-        std::vector<std::uint32_t>(static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height));
+    auto voronoi = std::vector<std::uint32_t>(image.width * image.height);
 
-    const auto rows = std::views::iota(0, image.height);
+    const auto rows = std::views::iota(0uz, image.height);
 
     const auto total_t0 = steady_clock::now();
     auto       iterations_executed = 0uz;
@@ -31,11 +30,10 @@ auto run_level4_par_unseq(const config& cfg, const image_data& image, const exec
             generators->data(), generators->size(), static_cast<float>(image.width), static_cast<float>(image.height));
 
         const auto w = image.width;
-        std::for_each(std::execution::par_unseq, rows.begin(), rows.end(), [&tree, &voronoi, w](int y) {
-            const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(w);
+        std::for_each(std::execution::par_unseq, rows.begin(), rows.end(), [&tree, &voronoi, w](std::size_t y) {
             const auto fy = static_cast<float>(y);
-            for (auto x = 0; x < w; ++x) {
-                voronoi[row + static_cast<std::size_t>(x)] = tree.nearest(static_cast<float>(x), fy);
+            for (auto x = 0uz; x < w; ++x) {
+                voronoi[(y * w) + x] = tree.nearest(static_cast<float>(x), fy);
             }
         });
 
