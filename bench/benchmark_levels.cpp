@@ -85,9 +85,9 @@ void run_benchmark(benchmark::State&  state,
 
 void bench_level1_giraffe(benchmark::State& state)
 {
-    run_benchmark(state, "data/giraffe.jpg", stippling::run_level1, 1000, 20);
+    run_benchmark(state, "data/giraffe.jpg", stippling::run_level1, 20000, 5);
 }
-BENCHMARK(bench_level1_giraffe)->Name("level1/giraffe/1000")->Unit(benchmark::kMillisecond);
+BENCHMARK(bench_level1_giraffe)->Name("level1/giraffe/20000")->Unit(benchmark::kMillisecond);
 
 // --- giraffe.jpg (1024x683) ---
 
